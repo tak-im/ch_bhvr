@@ -1,8 +1,7 @@
 from ch_bhvr.interface import IContext, IIntervention, IObservedBehavior, IRecords, IUserBehaviorSimulator
 from typing import List
-from scipy.stats import norm
-import random
 import numpy as np
+from ch_bhvr import util
 
 class UserContext(IContext):
     context: int
@@ -24,10 +23,11 @@ class SimpleUserSimParams():
     prob_context: List[float]
 
     # user param (by context, behabior)
+    true_utility: List[List[float]]
     base_utility: List[List[float]]
     utility_std: List[List[float]]
 
-    # user behabior understanding (by behabior)
+    # user behabior understanding (by context, behabior)
     understanding: List[List[float]]
 
     # intervention
@@ -42,10 +42,14 @@ class Record():
     index: int
     context: int
     intervention: int
-    tmp_utility: List[float]
+    tmp_true_utility: List[float]
+    tmp_base_utility: List[float]
     tmp_understanding: List[float]
     prm_understanding: List[float]
+    perceived_utility: List[float]
+    recognition_error: float
     observed_behaviors: List[int]
+    
 
 class Records(IRecords):
     params: SimpleUserSimParams
@@ -66,7 +70,8 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
     _prob_context: List[float] = None
 
     # user param (by context, behabior)
-    _base_utility: List[List[float]] = None
+    _true_utility : List[List[float]] = None # if understand 100%
+    _base_utility : List[List[float]] = None # if understand 0%
     _utility_std: List[List[float]] = None
 
     # user behabior understanding (by behabior)
@@ -79,7 +84,8 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
 
     #temporal_state
     _current_context: UserContext = None
-    _temporal_utility: np.ndarray = None
+    _temporal_true_utility: np.ndarray = None
+    _temporal_base_utility: np.ndarray = None
     _temporal_understanding: np.ndarray = None
 
 
@@ -109,7 +115,8 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
 
         self._prob_context = params.prob_context      
 
-        self._base_utility = params.base_utility
+        self._true_utility  = params.true_utility 
+        self._base_utility  = params.base_utility 
         self._utility_std = params.utility_std
 
         self._understanding = params.understanding
@@ -134,10 +141,13 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         self._temporal_understanding = np.array(self._understanding[context_index])
 
         # renew temporal state
+        true_utility: List[float] = self._true_utility[context_index]
         base_utility: List[float] = self._base_utility[context_index]
         utility_std: List[float] = self._utility_std[context_index]
-        self._temporal_utility = np.random.normal(base_utility, utility_std)
-        self._base_utility = self._temporal_utility.clip(0.0, 1.0)
+        self._temporal_true_utility = np.random.normal(true_utility , utility_std)
+        self._temporal_true_utility  = self._temporal_true_utility.clip(util.MIN_PROB, util.MAX_PROB)
+        self._temporal_base_utility = np.random.normal(base_utility , utility_std)
+        self._temporal_base_utility  = self._temporal_base_utility.clip(util.MIN_PROB, util.MAX_PROB)
 
         #record
         if self._current_record is not None:
@@ -145,21 +155,21 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         self._current_record = Record()
         self._current_record.index = self._index
         self._current_record.context = context_index
-        self._current_record.tmp_utility = self._temporal_utility.copy()
+        self._current_record.tmp_true_utility = self._temporal_true_utility.copy()
+        self._current_record.tmp_base_utility = self._temporal_base_utility.copy()
 
         return context
 
-    def interaction(self, intervention: IIntervention) -> ObservedUserBehavior:
-        intervention_idx: int = intervention
+    def interaction(self, intervention: Intervention) -> ObservedUserBehavior:
+        intervention_idx: int = intervention.intervention
         context_idx: int = self._current_context.context
         accept_rate: float = self._prob_accept_interventions[context_idx][intervention_idx]
         tmp_effect: List[float] = self._effect_temporal_understanding[intervention_idx]
 
         if self._rng.uniform(0.0, 1.0) < accept_rate:
             self._temporal_understanding += tmp_effect
-            self._temporal_understanding = self._temporal_understanding.clip(0.0, 0.99)
+            self._temporal_understanding = self._temporal_understanding.clip(util.MIN_PROB, util.MAX_PROB)
             # TODO: parmanent effect
-
         
         behavior: ObservedUserBehavior = self._generate_user_behavior()
 
@@ -176,18 +186,30 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         behavior: ObservedUserBehavior = ObservedUserBehavior()
 
         # user perception of behabior utilitys
-        #perceived_utilities: np.ndarray = self._temporal_utility * self._temporal_understanding
-        #print(self._temporal_understanding)
-        perceived_utilities: np.ndarray = np.random.normal(self._temporal_understanding, self._temporal_understanding * (self._temporal_understanding * (-1.0) + 1.0))
+        perceived_utilities: np.ndarray = self._temporal_true_utility * self._temporal_understanding + self._temporal_base_utility * (1.0 - self._temporal_understanding)
+        print("true utility: ", self._temporal_true_utility)
+        print("base utility: ", self._temporal_base_utility)
+        print("understanding: ", self._temporal_understanding)
+        print("perceived utility: ", perceived_utilities)
 
         # user behavior
-        #print(perceived_utilities)
-        perceived_utilities = perceived_utilities.clip(0.0, None)
+        perceived_utilities = perceived_utilities.clip(util.MIN_PROB, util.MAX_PROB)
+
+        p = self._temporal_true_utility / self._temporal_true_utility.sum()
+        q = perceived_utilities / perceived_utilities.sum()
+        re: float = util.relative_entropy(p,q)
+
+        # record
+        self._current_record.perceived_utility = perceived_utilities
+        self._current_record.recognition_error = re
+
+
         #print(perceived_utilities)
         prob_p_u: np.ndarray = perceived_utilities / perceived_utilities.sum()
         #print(prob_p_u)
         observed_behaviors: np.ndarray = np.random.choice(a=self._behavior_size, size=self._behavior_observation_size, p=prob_p_u)
         behavior.behaviors = observed_behaviors
+
 
         return behavior
     

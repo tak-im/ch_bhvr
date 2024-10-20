@@ -12,7 +12,8 @@ def main():
 
     params.prob_context = [1.0]
 
-    params.base_utility = [[0.01, 0.2, 0.8, 0.1, 0.4]]
+    params.true_utility  = [[0.01, 0.2, 0.8, 0.1, 0.4]]
+    params.base_utility  = [[0.1, 0.1, 0.1, 0.1, 0.1]]
     params.utility_std = [[0.01, 0.02, 0.1, 0.01, 0.1]]
 
     params.understanding = [[0.2, 0.2, 0.5, 0.1, 0.1]]
@@ -33,7 +34,7 @@ def main():
     intervention: Intervention = Intervention()
     intervention.intervention = 0
 
-    observed: ObservedUserBehavior = sim.interaction(0)
+    observed: ObservedUserBehavior = sim.interaction(intervention)
 
     print("intervention: ", intervention.intervention)
     print("observed: ", observed.behaviors)
