@@ -187,10 +187,10 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
 
         # user perception of behabior utilitys
         perceived_utilities: np.ndarray = self._temporal_true_utility * self._temporal_understanding + self._temporal_base_utility * (1.0 - self._temporal_understanding)
-        print("true utility: ", self._temporal_true_utility)
-        print("base utility: ", self._temporal_base_utility)
-        print("understanding: ", self._temporal_understanding)
-        print("perceived utility: ", perceived_utilities)
+        #print("true utility: ", self._temporal_true_utility)
+        #print("base utility: ", self._temporal_base_utility)
+        #print("understanding: ", self._temporal_understanding)
+        #print("perceived utility: ", perceived_utilities)
 
         # user behavior
         perceived_utilities = perceived_utilities.clip(util.MIN_PROB, util.MAX_PROB)
@@ -203,15 +203,16 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         self._current_record.perceived_utility = perceived_utilities
         self._current_record.recognition_error = re
 
-
         #print(perceived_utilities)
         prob_p_u: np.ndarray = perceived_utilities / perceived_utilities.sum()
         #print(prob_p_u)
         observed_behaviors: np.ndarray = np.random.choice(a=self._behavior_size, size=self._behavior_observation_size, p=prob_p_u)
         behavior.behaviors = observed_behaviors
 
-
         return behavior
     
+    def get_current_record(self) -> Record:
+        return self._current_record
+
     def get_records(self) -> Records:
         return self._records
