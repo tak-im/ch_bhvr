@@ -150,8 +150,7 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         self._temporal_base_utility  = self._temporal_base_utility.clip(util.MIN_PROB, util.MAX_PROB)
 
         #record
-        if self._current_record is not None:
-            self._records.records.append(self._current_record)
+        self._append_record()
         self._current_record = Record()
         self._current_record.index = self._index
         self._current_record.context = context_index
@@ -159,6 +158,11 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         self._current_record.tmp_base_utility = self._temporal_base_utility.copy()
 
         return context
+
+    def _append_record(self):
+        if self._current_record is not None:
+            self._records.records.append(self._current_record)
+            self._current_record = None
 
     def interaction(self, intervention: Intervention) -> ObservedUserBehavior:
         intervention_idx: int = intervention.intervention
@@ -215,4 +219,5 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         return self._current_record
 
     def get_records(self) -> Records:
+        self._append_record()
         return self._records
