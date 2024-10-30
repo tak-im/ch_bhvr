@@ -47,7 +47,7 @@ def main():
 
     rec: RERec = RERec(params.intervention_size, params.behavior_size)
 
-    for t in range(200):
+    for t in range(500):
         print("----- prestep ", str(t), "-----")
         context: UserContext = sim.next_step()
         intervention: Intervention = Intervention()
@@ -55,7 +55,7 @@ def main():
         observed: ObservedUserBehavior = sim.interaction(intervention)
         rec.update(context, intervention, observed)
 
-    for t in range(200):
+    for t in range(1000):
         print("===== step ", str(t), "=====")
         context: UserContext = sim.next_step()
         intervention: Intervention = rec.select_intervention(context)
@@ -71,7 +71,7 @@ def main():
     trial_window_size = 50  
     trials: List[int] = []
     errors: List[float] = []
-    ivs: List[List[float]] = [[]] * records.params.intervention_size   
+    ivs: List[List[float]] = [[] for _ in range(records.params.intervention_size)]
     tmp_size: float = 0.0
     tmp_err_sum: float = 0.0
     tmp_iv_sum: List[int] = [0] * records.params.intervention_size
@@ -86,13 +86,13 @@ def main():
             print(tmp_iv_sum)
             trials.append(record.index)
             errors.append(tmp_err_sum / tmp_size)
-            #for iv in range(records.params.intervention_size):
-            #    print(ivs[iv])
-            #    print(tmp_iv_sum[iv])
-            #    ivs[iv].append(tmp_iv_sum[iv])
+            for iv in range(records.params.intervention_size):
+                #print(ivs[iv])
+                #print(tmp_iv_sum[iv])
+                (ivs[iv]).append(tmp_iv_sum[iv])
             tmp_size = 0.0
             tmp_err_sum = 0.0
-            #tmp_iv_sum = [0] * records.params.intervention_size
+            tmp_iv_sum = [0] * records.params.intervention_size
 
     #print(ivs)
 
@@ -101,13 +101,12 @@ def main():
     #ax.hist(errors, bins=10)
     #plt.show()
 
-    #fig2, ax2 = plt.subplots()
-    #ivs_np: np.ndarray = np.array(ivs)
-    #bottom_np: np.ndarray = np.zeros(len(trials))
-    #for iv in range(records.params.intervention_size):
-    #    ax2.bar(trials, ivs[iv], bottom=bottom_np.tolist())
-    #    bottom_np = bottom_np + ivs_np[iv]
-    #ax.hist(errors, bins=10)
+    fig2, ax2 = plt.subplots()
+    ivs_np: np.ndarray = np.array(ivs)
+    bottom_np: np.ndarray = np.zeros(len(trials))
+    for iv in range(records.params.intervention_size):
+        ax2.bar(trials, ivs[iv], bottom=bottom_np.tolist(), width=20)
+        bottom_np = bottom_np + ivs_np[iv]
     plt.show()
 
 
