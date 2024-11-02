@@ -10,8 +10,8 @@ class RERec():
     _len_intervention: int
     _len_behavior: int
 
-    # context, intervention -> alpha by behabior
-    _params: Dict[Tuple[int, int, int], List[float]] = {}
+    # alpha, beta, by context, intervention, behabior
+    _params: Dict[Tuple[int, int, int], Tuple[int, int]] = {}
 
     # hashmap
     _count_ci: Dict[Tuple[int, int], int] = {}# (context, intervention) -> count
@@ -66,21 +66,20 @@ class RERec():
         if intervention == 0 and self._is_no_intervation_utility_sample==False:
             for bhvr in range(self._len_behavior):
                 count_cib: int = self._count_cib.get((context, intervention, bhvr), 0)
-                utilities[bhvr] = float(count_cib) / float(count_ci)
+                alpha, beta = self._alpha_beta((context, intervention, bhvr))
+                utilities[bhvr] = float(alpha + count_cib) / float(alpha + beta + count_ci)
         else:
-            alphas: List[float] = self._alphas((context, intervention))
             for bhvr in range(self._len_behavior):
-                count_cib: float = float(self._count_cib.get((context, intervention, bhvr), 0))
-                alphas[bhvr] += count_cib
-                print("alphas: ", alphas)
-            #utilities = np.random.beta(alpha + count_cib, beta + count_ci - count_cib)
-            utilities = np.random.dirichlet(alpha=alphas).tolist()
+                count_cib: int = self._count_cib.get((context, intervention, bhvr), 0)
+                alpha, beta = self._alpha_beta((context, intervention, bhvr))
+                #print("alpha: ", alpha, ", beta: ", beta, ", count_ci: ", count_ci, "count_cib: ", count_cib)
+                utilities[bhvr] = np.random.beta(alpha + count_cib, beta + count_ci - count_cib)
 
         return utilities
 
-    def _alphas(self, ci: Tuple[int, int]) -> List[float]:
-        alphas: List[float] = self._params.get(ci, [1.0] * self._len_behavior)
-        return alphas
+    def _alpha_beta(self, cib: Tuple[int, int, int]) -> Tuple[int, int]:
+        a_b: Tuple[int, int] = self._params.get(cib, (1, 1))
+        return a_b
 
     def update(self, context: UserContext, intervention: Intervention, observed: ObservedUserBehavior) -> None:
         ci = (context.context, intervention.intervention)

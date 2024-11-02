@@ -1,6 +1,7 @@
 from ch_bhvr.simple_user_sim import SimpleUserSimulator, SimpleUserSimParams
 from ch_bhvr.simple_user_sim import UserContext, ObservedUserBehavior, Intervention, Record, Records
-from ch_bhvr.relative_entropy_recommender import RERec
+from ch_bhvr.relative_entropy_recommender_old import RERec
+from ch_bhvr.record_viewer import RecordViewer
 import numpy as np
 from typing import List
 import matplotlib.pyplot as plt
@@ -22,6 +23,7 @@ def main():
     params.understanding = [[0.2, 0.2, 0.5, 0.1, 0.1]]
 
     params.prob_accept_interventions = [[0.5, 0.5, 0.5, 0.5, 0.5, 0.5]]
+    #params.prob_accept_interventions = [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
     params.effect_temporal_understanding = [[0.0, 0.0, 0.0, 0.0, 0.0],
                                              [0.5, 0.0, 0.0, 0.0, 0.0],
                                              [0.0, 0.5, 0.0, 0.0, 0.0],
@@ -55,10 +57,12 @@ def main():
         observed: ObservedUserBehavior = sim.interaction(intervention)
         rec.update(context, intervention, observed)
 
-    for t in range(1000):
+    for t in range(500):
         print("===== step ", str(t), "=====")
         context: UserContext = sim.next_step()
         intervention: Intervention = rec.select_intervention(context)
+        #intervention = Intervention()
+        #intervention.intervention = 3
         observed: ObservedUserBehavior = sim.interaction(intervention)
         rec.update(context, intervention, observed)
         record: Record = sim.get_current_record()
@@ -66,9 +70,13 @@ def main():
 
     records: Records = sim.get_records()
 
-    size: int = len(records.records)
-    print("size: ", str(size))
-    trial_window_size = 50  
+    viewer = RecordViewer(records)
+    viewer.view_error(100)
+    viewer.view_intervention(100)
+    plt.show()
+
+    """
+    trial_window_size = 100  
     trials: List[int] = []
     errors: List[float] = []
     ivs: List[List[float]] = [[] for _ in range(records.params.intervention_size)]
@@ -108,7 +116,7 @@ def main():
         ax2.bar(trials, ivs[iv], bottom=bottom_np.tolist(), width=20)
         bottom_np = bottom_np + ivs_np[iv]
     plt.show()
-
+    """
 
 
 if __name__ == "__main__":
