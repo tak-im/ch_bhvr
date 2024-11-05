@@ -1,6 +1,6 @@
-from ch_bhvr.simple_user_sim2 import SimpleUserSimulator, SimpleUserSimParams, UserContext, ObservedUserBehavior, Intervention, Record, Records
-#from ch_bhvr.relative_entropy_recommender import RERec
-from ch_bhvr.rec_test import RERec
+from ch_bhvr.simple_user_sim import SimpleUserSimulator, SimpleUserSimParams
+from ch_bhvr.simple_user_sim import UserContext, ObservedUserBehavior, Intervention, Record, Records
+from ch_bhvr.relative_entropy_recommender_old import RERec
 from ch_bhvr.record_viewer import RecordViewer
 import numpy as np
 from typing import List
@@ -10,30 +10,24 @@ def main():
     # params
     params: SimpleUserSimParams = SimpleUserSimParams()
     params.context_size = 1
-    params.behavior_size = 5
-    params.intervention_size = 6
-    params.behavior_observation_size = 40
+    params.behavior_size = 2
+    params.intervention_size = 3
+    params.behavior_observation_size = 100
 
     params.prob_context = [1.0]
 
-    params.true_utility  = [[0.01, 0.2, 0.8, 0.1, 0.4]]
-    params.base_utility  = [[0.1, 0.1, 0.1, 0.1, 0.1]]
-    params.utility_std = [[0.0, 0.0, 0.0, 0.0, 0.0]]
-    #params.utility_std = [[0.01, 0.01, 0.01, 0.01, 0.01]]
-    params.utility_decay = [[0.05, 0.05, 0.05, 0.05, 0.05]]
+    params.true_utility  = [[0.65, 0.35]]
+    params.base_utility  = [[0.3, 0.7]]
+    params.utility_std = [[0.2, 0.2]]
 
-    params.understanding = [[0.2, 0.2, 0.5, 0.1, 0.1]]
+    params.understanding = [[0.2, 0.3]]
 
-    #params.prob_accept_interventions = [[0.2, 0.2, 0.2, 0.2, 0.2, 0.2]]
-    params.prob_accept_interventions = [[0.5, 0.5, 0.5, 0.5, 0.5, 0.5]]
-    #params.prob_accept_interventions = [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
-    params.effect_temporal_understanding = [[0.0, 0.0, 0.0, 0.0, 0.0],
-                                             [0.5, 0.0, 0.0, 0.0, 0.0],
-                                             [0.0, 0.5, 0.0, 0.0, 0.0],
-                                             [0.0, 0.0, 0.5, 0.0, 0.0],
-                                             [0.0, 0.0, 0.0, 0.5, 0.0],
-                                             [0.0, 0.0, 0.0, 0.0, 0.5]]
-    params.effect_permanent_understanding = np.zeros((6, 5)).tolist()
+    #params.prob_accept_interventions = [[0.5, 0.5, 0.5]]
+    params.prob_accept_interventions = [[1.0, 1.0, 1.0]]
+    params.effect_temporal_understanding = [[0.0, 0.0],
+                                             [0.4, 0.0],
+                                             [0.2, 0.2]]
+    params.effect_permanent_understanding = np.zeros((3, 2)).tolist()
 
     sim: SimpleUserSimulator = SimpleUserSimulator(params)
 
@@ -69,15 +63,15 @@ def main():
         observed: ObservedUserBehavior = sim.interaction(intervention)
         rec.update(context, intervention, observed)
         record: Record = sim.get_current_record()
-        print("Intervention: ", intervention.intervention, ", Error: ", record.utility_error)
+        print("Intervention: ", intervention.intervention, ", Error: ", record.recognition_error)
 
     sim.print_internal_info()
     records: Records = sim.get_records()
 
     viewer = RecordViewer(records)
 
-    viewer.view_error(50)
-    viewer.view_intervention(25)
+    viewer.view_error(10)
+    viewer.view_intervention(10)
     plt.show()
 
     """
