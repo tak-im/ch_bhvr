@@ -54,7 +54,11 @@ class RERec():
         utilities_np = utilities_np / utilities_np.sum()
 
         #re = np.dot(utilities_np, np.log2(utilities_np / base_utilities_np))
-        re = util.relative_entropy(utilities_np, base_utilities_np)
+        #re = util.relative_entropy(utilities_np, base_utilities_np)
+        print("base", base_utilities_np)
+        print("sample", utilities_np)
+        re = util.jaccard_like(utilities_np, base_utilities_np)
+        print("dist", re)
 
         return re
 
@@ -72,7 +76,7 @@ class RERec():
             for bhvr in range(self._len_behavior):
                 count_cib: float = float(self._count_cib.get((context, intervention, bhvr), 0))
                 alphas[bhvr] += count_cib
-                print("alphas: ", alphas)
+                #print("alphas: ", alphas)
             #utilities = np.random.beta(alpha + count_cib, beta + count_ci - count_cib)
             utilities = np.random.dirichlet(alpha=alphas).tolist()
 

@@ -1,6 +1,6 @@
 from ch_bhvr.simple_user_sim import SimpleUserSimulator, SimpleUserSimParams
 from ch_bhvr.simple_user_sim import UserContext, ObservedUserBehavior, Intervention, Record, Records
-from ch_bhvr.relative_entropy_recommender_old import RERec
+from ch_bhvr.relative_entropy_recommender import RERec
 from ch_bhvr.record_viewer import RecordViewer
 import numpy as np
 from typing import List
@@ -63,7 +63,7 @@ def main():
         observed: ObservedUserBehavior = sim.interaction(intervention)
         rec.update(context, intervention, observed)
         record: Record = sim.get_current_record()
-        print("Intervention: ", intervention.intervention, ", Error: ", record.recognition_error)
+        print("Intervention: ", intervention.intervention, ", Error: ", record.utility_error)
 
     sim.print_internal_info()
     records: Records = sim.get_records()

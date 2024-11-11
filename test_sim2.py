@@ -1,6 +1,7 @@
-from ch_bhvr.simple_user_sim2 import SimpleUserSimulator, SimpleUserSimParams, UserContext, ObservedUserBehavior, Intervention, Record, Records
-#from ch_bhvr.relative_entropy_recommender import RERec
-from ch_bhvr.rec_test import RERec
+from ch_bhvr.simple_user_sim import SimpleUserSimulator, SimpleUserSimParams, UserContext, ObservedUserBehavior, Intervention, Record, Records
+#from ch_bhvr.simple_user_sim2 import SimpleUserSimulator, SimpleUserSimParams, UserContext, ObservedUserBehavior, Intervention, Record, Records
+from ch_bhvr.relative_entropy_recommender import RERec
+#from ch_bhvr.rec_test import RERec
 from ch_bhvr.record_viewer import RecordViewer
 import numpy as np
 from typing import List
@@ -10,30 +11,32 @@ def main():
     # params
     params: SimpleUserSimParams = SimpleUserSimParams()
     params.context_size = 1
-    params.behavior_size = 5
+    params.behavior_size = 6
     params.intervention_size = 6
-    params.behavior_observation_size = 40
+    params.behavior_observation_size = 100
 
     params.prob_context = [1.0]
 
-    params.true_utility  = [[0.01, 0.2, 0.8, 0.1, 0.4]]
-    params.base_utility  = [[0.1, 0.1, 0.1, 0.1, 0.1]]
-    params.utility_std = [[0.0, 0.0, 0.0, 0.0, 0.0]]
-    #params.utility_std = [[0.01, 0.01, 0.01, 0.01, 0.01]]
-    params.utility_decay = [[0.05, 0.05, 0.05, 0.05, 0.05]]
+    params.true_utility  = [[0.5, 0.01, 0.03, 0.3, 0.01, 0.15]]
+    #params.base_utility  = [[0.75, 0.05, 0.05, 0.05, 0.05, 0.05]]
+    params.base_utility  = [[0.5, 0.1, 0.1, 0.1, 0.1, 0.1]]
+    params.utility_std = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+    #params.utility_std = [[0.01, 0.01, 0.01, 0.01, 0.01, 0.01]]
+    #params.utility_decay = [[0.0, 0.05, 0.05, 0.05, 0.05, 0.05]]
+    params.utility_decay = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
 
-    params.understanding = [[0.2, 0.2, 0.5, 0.1, 0.1]]
+    params.understanding = [[0.0, 0.2, 0.2, 0.5, 0.1, 0.1]]
 
     #params.prob_accept_interventions = [[0.2, 0.2, 0.2, 0.2, 0.2, 0.2]]
-    params.prob_accept_interventions = [[0.5, 0.5, 0.5, 0.5, 0.5, 0.5]]
-    #params.prob_accept_interventions = [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
-    params.effect_temporal_understanding = [[0.0, 0.0, 0.0, 0.0, 0.0],
-                                             [0.5, 0.0, 0.0, 0.0, 0.0],
-                                             [0.0, 0.5, 0.0, 0.0, 0.0],
-                                             [0.0, 0.0, 0.5, 0.0, 0.0],
-                                             [0.0, 0.0, 0.0, 0.5, 0.0],
-                                             [0.0, 0.0, 0.0, 0.0, 0.5]]
-    params.effect_permanent_understanding = np.zeros((6, 5)).tolist()
+    #params.prob_accept_interventions = [[0.5, 0.5, 0.5, 0.5, 0.5, 0.5]]
+    params.prob_accept_interventions = [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
+    params.effect_temporal_understanding = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                                             [0.0, 0.5, 0.0, 0.0, 0.0, 0.0],
+                                             [0.0, 0.0, 0.5, 0.0, 0.0, 0.0],
+                                             [0.0, 0.0, 0.0, 0.5, 0.0, 0.0],
+                                             [0.0, 0.0, 0.0, 0.0, 0.5, 0.0],
+                                             [0.0, 0.0, 0.0, 0.0, 0.0, 0.5]]
+    params.effect_permanent_understanding = np.zeros((6, 6)).tolist()
 
     sim: SimpleUserSimulator = SimpleUserSimulator(params)
 
@@ -52,7 +55,7 @@ def main():
 
     rec: RERec = RERec(params.intervention_size, params.behavior_size)
 
-    for t in range(100):
+    for t in range(200):
         print("----- prestep ", str(t), "-----")
         context: UserContext = sim.next_step()
         intervention: Intervention = Intervention()
@@ -60,7 +63,7 @@ def main():
         observed: ObservedUserBehavior = sim.interaction(intervention)
         rec.update(context, intervention, observed)
 
-    for t in range(100):
+    for t in range(500):
         print("===== step ", str(t), "=====")
         context: UserContext = sim.next_step()
         intervention: Intervention = rec.select_intervention(context)
@@ -77,7 +80,7 @@ def main():
     viewer = RecordViewer(records)
 
     viewer.view_error(50)
-    viewer.view_intervention(25)
+    viewer.view_intervention(50)
     plt.show()
 
     """

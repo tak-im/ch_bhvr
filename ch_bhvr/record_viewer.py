@@ -37,22 +37,28 @@ class RecordViewer():
     def view_error(self, view_window_size: int):
         trials: List[int] = []
         errors: List[float] = []
+        changes: List[float] = []
         tmp_size: float = 0.0
         tmp_err_sum: float = 0.0
+        tmp_change_sum: float = 0.0
 
         for record in self._records.records:
             tmp_size += 1.0
-            tmp_err_sum += record.utility_error
+            tmp_err_sum += record.behavior_error
+            tmp_change_sum += record.behavior_change
             #print(record.index)
             #errors[record.index-1] = record.recognition_error
             if tmp_size >= view_window_size:
                 trials.append(record.index)
-                errors.append(tmp_err_sum / tmp_size)
+                errors.append(1.0 - tmp_err_sum / tmp_size)
+                changes.append(tmp_change_sum / tmp_size)
                 tmp_size = 0.0
                 tmp_err_sum = 0.0
+                tmp_change_sum = 0.0
 
         fig, ax = plt.subplots()
         ax.plot(trials, errors)
+        #ax.plot(trials, changes)
         #plt.show()
 
     def view_intervention(self, view_window_size: int):

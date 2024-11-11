@@ -1,5 +1,5 @@
 from ch_bhvr.interface import IContext, IIntervention, IObservedBehavior, IRecords, IUserBehaviorSimulator
-from typing import List
+from typing import List, Tuple
 import numpy as np
 from ch_bhvr import util
 
@@ -7,7 +7,7 @@ class UserContext(IContext):
     context: int
 
 class ObservedUserBehavior(IObservedBehavior):
-    behaviors: List[int]
+    behaviors: List[int] # 0: unrelated behavior
 
 class Intervention(IIntervention):
     intervention: int # 0:no intervention
@@ -47,9 +47,15 @@ class Record():
     tmp_understanding: List[float]
     prm_understanding: List[float]
     perceived_utility: List[float]
-    recognition_error: float
+    recognition_re: float
     observed_behaviors: List[int]
-    
+    utility_error: float
+    true_behavior: List[int]
+    base_behavior: List[int]
+    behavior_hist: List[int]
+    behavior_error: float
+    behavior_change: float
+   
 
 class Records(IRecords):
     params: SimpleUserSimParams
@@ -224,32 +230,75 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
     def _generate_user_behavior(self) -> ObservedUserBehavior:
         behavior: ObservedUserBehavior = ObservedUserBehavior()
 
+        #true_utilities: np.ndarray = self._temporal_true_utility / self._temporal_true_utility.sum()
+        true_utilities: np.ndarray = self._temporal_true_utility.copy()
+        true_utilities[0] -= true_utilities.sum() - 1.0
+        #base_utility: np.ndarray = self._temporal_base_utility / self._temporal_base_utility.sum()
+        base_utility: np.ndarray = self._temporal_base_utility.copy()
+        base_utility[0] -= base_utility.sum() - 1.0
+
         # user perception of behabior utilitys
         perceived_utilities: np.ndarray = self._temporal_true_utility * self._temporal_understanding + self._temporal_base_utility * (1.0 - self._temporal_understanding)
+        #perceived_utilities = perceived_utilities / perceived_utilities.sum()
+        perceived_utilities[0] -= perceived_utilities.sum() - 1.0
         #print("true utility: ", self._temporal_true_utility)
         #print("base utility: ", self._temporal_base_utility)
         #print("understanding: ", self._temporal_understanding)
         #print("perceived utility: ", perceived_utilities)
 
-        # user behavior
-        perceived_utilities = perceived_utilities.clip(util.MIN_PROB, util.MAX_PROB)
+        # true
+        true_history, max_true_util = self._calc_util_2_behavior(true_utilities, None)
+        # noiv
+        noiv_understanding: np.ndarray = np.array(self._understanding[self._current_context.context])
+        noiv_utility = self._temporal_true_utility * noiv_understanding + self._temporal_base_utility * (1.0 - noiv_understanding)
+        noiv_utility[0] -= noiv_utility.sum() - 1.0
+        noiv_history, max_noiv_utility = self._calc_util_2_behavior(noiv_utility, None)
 
-        p = self._temporal_true_utility / self._temporal_true_utility.sum()
-        q = perceived_utilities / perceived_utilities.sum()
+        #print(perceived_utilities)
+        observed_behaviors: np.ndarray = np.random.choice(a=self._behavior_size, size=self._behavior_observation_size, p=perceived_utilities)
+        behavior.behaviors = observed_behaviors
+        #print(observed_behaviors)
+
+        behavior_history: np.ndarray = np.zeros(self._behavior_size)
+        for bhvr in observed_behaviors:
+            behavior_history[bhvr] += 1
+
+        # user behavior
+        p = true_utilities
+        q = perceived_utilities
         re: float = util.relative_entropy(p,q)
+
+        print("noiv_history: ", noiv_history)
+        print("history: ", behavior_history)
+        print("true_history: ", true_history)
+        behavior_dist_n2iv: float = util.jaccard_like(behavior_history, noiv_history)
+        behavior_dist_iv2true: float = util.jaccard_like(true_history, behavior_history)
 
         # record
         self._current_record.perceived_utility = perceived_utilities
-        self._current_record.recognition_error = re
+        self._current_record.recognition_re = re
+        #self._current_record.max_utility = max_utility
+        #self._current_record.gained_utility = 0.0
+        self._current_record.utility_error = max_true_util - 0.0
 
-        #print(perceived_utilities)
-        prob_p_u: np.ndarray = perceived_utilities / perceived_utilities.sum()
-        #print(prob_p_u)
-        observed_behaviors: np.ndarray = np.random.choice(a=self._behavior_size, size=self._behavior_observation_size, p=prob_p_u)
-        behavior.behaviors = observed_behaviors
+        self._current_record.behavior_hist = behavior_history
+        self._current_record.true_behavior = true_history
+        self._current_record.base_behavior = noiv_history
+        self._current_record.behavior_error = behavior_dist_iv2true
+        self._current_record.behavior_change = behavior_dist_n2iv
+
 
         return behavior
-    
+
+    # ランダム性のよらずにutilityから行動分布を生成
+    def _calc_util_2_behavior(self, utility: np.ndarray, decay: np.ndarray) -> Tuple[np.ndarray, float]:
+        # 確率的に選択しない場合の行動分布を計算
+        history: np.ndarray = np.zeros(self._behavior_size)
+        utility_max = 0.0
+        p_util: np.ndarray = utility / utility.sum()
+        history = float(self._behavior_observation_size) * p_util
+        return history, utility_max
+
     def get_current_record(self) -> Record:
         return self._current_record
 
@@ -299,14 +348,17 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
             for i in range(params.intervention_size):
                 print("intervention: ", i)
                 utility: np.ndarray = utility_cib[c, i] / utility_cib[c, i].sum()
+                print("base: ", no_iv_util)
                 print("utility: ", utility)
-                re: float = util.relative_entropy(true_util, utility)
-                print("dist to true: ", re)
+                print("true: ", true_util)
+                #dist: float = util.relative_entropy(true_util, utility)
                 accept_rate: float = params.prob_accept_interventions[c][i]
-                print("exp dist to true", re * accept_rate)
-                re_from_base: float = util.relative_entropy(utility, no_iv_util)
-                print("dist from no intervention", re_from_base)
-                print("exp dist from no intervention", re_from_base * accept_rate)
+                dist_base2iv: float = util.jaccard_like(utility, no_iv_util)
+                dist_iv2true: float = util.jaccard_like(true_util, utility)
+                print("cange", dist_base2iv)
+                print("error: ", dist_iv2true)
+                print("exp change", dist_base2iv * accept_rate)
+                print("exp error", dist_iv2true * accept_rate)
 
         #util.relative_entropy(params.true_utility, )
 

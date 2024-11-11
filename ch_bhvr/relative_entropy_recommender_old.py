@@ -34,7 +34,7 @@ class RERec():
 
     def select_intervention(self, context: UserContext) -> Intervention:
         base_util = self._sample_utility(context.context, 0)
-        print(base_util)
+        #print(base_util)
         base_util_np: np.array = np.array(base_util, dtype=float)
         base_util_np = base_util_np / base_util_np.sum()
 

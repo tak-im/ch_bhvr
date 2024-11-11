@@ -56,6 +56,11 @@ class Record():
     max_utility: float
     gained_utility: float
     utility_error: float
+    true_behavior: List[int]
+    base_behavior: List[int]
+    behavior_hist: List[int]
+    behavior_error: float
+    behavior_change: float
 
     
 
@@ -236,6 +241,7 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
 
         utility_decay: np.ndarray = np.array(self._utility_decay[self._current_context.context])
         true_utilities: np.ndarray = self._temporal_true_utility
+        base_utility: np.ndarray = self._temporal_base_utility
 
         # user perception of behabior utilitys
         perceived_utilities: np.ndarray = self._temporal_true_utility * self._temporal_understanding + self._temporal_base_utility * (1.0 - self._temporal_understanding)
@@ -247,6 +253,8 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
 
         # true
         true_history, max_utility = self._calc_util_2_behavior(true_utilities, utility_decay)
+        # base
+        base_history, base_utility = self._calc_util_2_behavior(base_utility, utility_decay)
         """
         true_history: np.ndarray = np.zeros(self._behavior_size)
         max_utility: float = 0.0
@@ -276,6 +284,9 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         q = perceived_utilities / perceived_utilities.sum()
         re: float = util.relative_entropy(p,q)
 
+        behavior_dist_n2iv: float = util.jaccard_hist(behavior_history, base_history)
+        behavior_dist_it2true: float = util.jaccard_hist(true_history, behavior_history)
+
         # record
         self._current_record.perceived_utility = perceived_utilities
         self._current_record.recognition_re = re
@@ -283,10 +294,17 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
         self._current_record.gained_utility = gained_utility
         self._current_record.utility_error = max_utility - gained_utility
 
+        self._current_record.behavior_hist = behavior_history
+        self._current_record.true_behavior = true_history
+        self._current_record.base_behavior = base_history
+        self._current_record.behavior_error = behavior_dist_it2true
+        self._current_record.behavior_change = behavior_dist_n2iv
+
         behavior.behaviors = observed_behaviors
 
         return behavior
 
+    # ランダム性のよらずにutilityから行動分布を生成
     def _calc_util_2_behavior(self, utility: np.ndarray, decay: np.ndarray) -> Tuple[np.ndarray, float]:
         # 確率的に選択しない場合の行動分布を計算
         history: np.ndarray = np.zeros(self._behavior_size)
@@ -376,8 +394,8 @@ class SimpleUserSimulator(IUserBehaviorSimulator):
                 p_true_b: np.ndarray = true_behavior / true_behavior.sum()
                 p_i_b: np.ndarray = behavior_i / behavior_i.sum()
                 p_noiv_b: np.ndarray = no_iv_behavior / no_iv_behavior.sum()
-                re: float = util.relative_entropy(p_true_b, p_i_b)
-                re_from_base: float = util.relative_entropy(p_i_b, p_noiv_b)
+                re: float = util.jaccard_hist(p_true_b, p_i_b)
+                re_from_base: float = util.jaccard_hist(p_i_b, p_noiv_b)
                 print("behavior no iv -> iv: ", re_from_base, ", iv -> true: ", re)
                 print("behavior(exp) no iv -> iv: ", re_from_base * accept_rate, ", iv -> true", re * accept_rate)
 
