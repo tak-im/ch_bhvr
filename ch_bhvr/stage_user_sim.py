@@ -2,54 +2,60 @@ from ch_bhvr.interface import IContext, IIntervention, IObservedBehavior, IRecor
 from typing import List, Tuple
 import numpy as np
 from ch_bhvr import util
+from dataclasses import dataclass
 
 class UserContext(IContext):
-    context: int
+    def __init__(self):
+        self.context: int = 0
 
 class ObservedUserBehavior(IObservedBehavior):
-    behaviors: np.ndarray # 0: unrelated behavior
-    hist: np.ndarray
+    def __init__(self):
+        self.behaviors: np.ndarray = None # 0: unrelated behavior
+        self.hist: np.ndarray = None
 
 class Intervention(IIntervention):
-    intervention: int # 0:no intervention
+    def __init__(self):
+        intervention: int = 0 # 0:no intervention
 
 class StageUserSimParams():
-    # probrem size
-    context_size: int
-    behavior_size: int
-    intervention_size: int
-    behavior_observation_size: int
+    def __init__(self):
+        # probrem size
+        self.context_size: int = 1
+        self.behavior_size: int = 6
+        self.intervention_size: int = 6
+        self.behavior_observation_size: int = 100
 
-    # context
-    prob_context: List[float]
+        # context
+        self.prob_context: List[float] = [1.0]
 
-    # user param 
-    init_progress: float
-    stage_size: int
-    stage_distribution: List[List[float]] # (by stage, behabior)
+        # user param 
+        self.init_progress: float = 0.1
+        self.stage_size: int = 5
+        self.stage_distribution: List[List[float]] = [] # (by stage, behabior) 
 
-    # intervention
-    # (by stage, context, intervention)
-    prob_accept_interventions: List[List[List[float]]]
-    # (by stage, context, intervention, behavior)
-    effect_to_temporal_distribution: List[List[List[List[float]]]]
-    #effect_to_temporal_distribution_var: List[List[List[float]]]
+        # intervention
+        # (by stage, context, intervention)
+        self.prob_accept_interventions: List[List[List[float]]] = []
+        # (by stage, context, intervention, behavior)
+        self.effect_to_temporal_distribution: List[List[List[List[float]]]] = []
+        #effect_to_temporal_distribution_var: List[List[List[float]]]
 
-    # behavior change
-    auto_change_coeff: float
-    change_coeff: float
+        # behavior change
+        self.auto_change_coeff: float = 0.0
+        self.change_coeff: float = 1.0
 
 class Record():
-    index: int
-    context: int
-    auto_progress: float
+    def __init__(self):       
+        self.index: int = None
+        self.context: int = None
+        self.auto_progress: float = None
 
-    progress_before_intervention: float
-    intervention: int
-    progress_after_intervention: float
+        self.progress_before_intervention: float = None
+        self.intervention: int = None
+        self.progress_after_intervention: float = None
 
-    observed_behaviors: np.ndarray
-    behavior_hist: np.ndarray
+        self.observed_behaviors: np.ndarray = None
+        self.behavior_hist: np.ndarray = None
    
 
 class Records(IRecords):
@@ -58,34 +64,29 @@ class Records(IRecords):
 
 class StageUserSimulator(IUserBehaviorSimulator):
 
-    # initial param
-    _params: StageUserSimParams = None
-
-    # user param 
-    _progress: float
-    
-    #temporal_state
-    _current_context: UserContext = None
-    _current_behavior_distribution: np.ndarray # by behavior
-    _temporal_behavior_distribution: np.ndarray # by behavior
-
-    #rng
-    _rng: np.random.Generator = None
-
-    # records
-    _index: int = 0
-    _records: Records = None
-    _current_record: Record = None
-
-    # replay_records
-    _replay_records: Records = None
-
     def __init__(self, params: StageUserSimParams):
-        self._params = params
-        self._records = Records()
+        # instance var
+        # initial param
+        self._params: StageUserSimParams = params
+        # user param 
+        self._progress: float        
+        #temporal_state
+        self._current_context: UserContext = None
+        self._current_behavior_distribution: np.ndarray # by behavior
+        self._temporal_behavior_distribution: np.ndarray # by behavior
+        #rng
+        self._rng: np.random.Generator = np.random.default_rng()
+        # records
+        self._index: int = 0
+        self._records: Records = Records()
         self._records.params = params
         self._records.records = []
-        self._rng = np.random.default_rng()
+
+        self._current_record: Record = None
+        # replay_records
+        self._replay_records: Records = None
+
+        # initialize
         self.init_state()
 
     def set_replay_records(self, records: Records):
@@ -104,7 +105,7 @@ class StageUserSimulator(IUserBehaviorSimulator):
 
         if self._replay_records is None:
             # sample context
-            context_index: int = np.random.choice(a=range(self._context_size), p=params._prob_context)
+            context_index: int = np.random.choice(a=range(params.context_size), p=params.prob_context)
             context.context = context_index
             self._current_context = context
 
@@ -164,7 +165,7 @@ class StageUserSimulator(IUserBehaviorSimulator):
     progressの自然変化、変化量を返す（再生用）
     """
     def _auto_progress(self) -> float:
-        params: StageUserSimParams = self.params
+        params: StageUserSimParams = self._params
         return self._rng.uniform(0, 1) * params.auto_change_coeff
 
     """
@@ -173,10 +174,14 @@ class StageUserSimulator(IUserBehaviorSimulator):
     """
     def _progress_detail(self) -> Tuple[int, int, float]:
         params: StageUserSimParams = self._params
-        a, b = divmod(self._progress, params.stage_size - 1)
+        #print(self._progress, ", ", (1.0 / (params.stage_size - 1)))
+        a, b = divmod(self._progress, (1.0 / (params.stage_size - 1)))
+        #print(a, ", ", b)
         stage: int = int(a)
         next_stage: int = stage + 1
-        local_progress: float = b * (params.stage_size - 1)
+        if next_stage >= params.stage_size:
+            next_stage = params.stage_size - 1
+        local_progress: float = b / (params.stage_size - 1)
         return (stage, next_stage, local_progress)
 
 
@@ -218,23 +223,45 @@ class StageUserSimulator(IUserBehaviorSimulator):
     """
     実際のbehaviorからprogressを更新
     """
-    def _progress(self, behavior: ObservedUserBehavior):
-        #TODO
-        pass
+    def _make_progress(self, behavior: ObservedUserBehavior):
+        params: StageUserSimParams = self._params
+        # 現在のstageで不足している行動
+        stage, next_stage, local_progress = self._progress_detail()      
+        stage_d: np.ndarray = np.array(params.stage_distribution[stage])
+        next_stage_d: np.ndarray = np.array(params.stage_distribution[next_stage])
+
+        # ステージ間で足らない行動
+        stage_diff: np.ndarray = next_stage_d - stage_d
+        stage_diff = stage_diff.clip(0, 1)
+        stage_diff[0] = 0.0
+
+        # 経験した行動が足らない行動をどの程度満たしたか
+        behavior_diff = behavior.hist.astype(np.float64)
+        behavior_diff = behavior_diff / behavior_diff.sum()
+        behavior_diff = behavior_diff - stage_d
+        behavior_diff = behavior_diff.clip(0, stage_diff)
+        behavior_diff[0] = 0.0
+
+        exp_progress: float = behavior_diff.sum() / stage_diff.sum()
+        print("progress: ", self._progress, ", stage: ", stage, ", local_progress: ", local_progress)
+        print("exp_progress: ", exp_progress)
+        if exp_progress > local_progress:
+            progress_diff: float = exp_progress - local_progress
+            progress_diff = progress_diff / ( params.stage_size - 1 )
+            self._progress = self._progress + progress_diff * params.change_coeff
 
     def interaction(self, intervention: Intervention) -> ObservedUserBehavior:
         params: StageUserSimParams = self._params
         intervention_idx: int = intervention.intervention
         context_idx: int = self._current_context.context
 
-        accept_rate: float = self._calc_accept_rate()
-        tmp_effect: np.ndarray = self._calc_temporal_effect(context_idx, intervention_idx)
+        accept_rate: float = self._calc_accept_rate(context_idx, intervention_idx)
 
         if self._rng.uniform(0.0, 1.0) < accept_rate:
             self._temporal_behavior_distribution = self._calc_temporal_distribution(context_idx, intervention_idx)
         
         behavior: ObservedUserBehavior = self._generate_user_behavior()
-        self._progress(behavior)
+        self._make_progress(behavior)
 
         # record
         self._current_record.intervention = intervention_idx
@@ -253,7 +280,7 @@ class StageUserSimulator(IUserBehaviorSimulator):
         behavior.behaviors = observed_behaviors
         #print(observed_behaviors)
 
-        behavior_histogram: np.ndarray = np.zeros(params._behavior_size)
+        behavior_histogram: np.ndarray = np.zeros(params.behavior_size)
         for bhvr in observed_behaviors:
             behavior_histogram[bhvr] += 1
         behavior.hist = behavior_histogram

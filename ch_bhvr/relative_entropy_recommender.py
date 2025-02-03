@@ -34,7 +34,7 @@ class RERec():
 
     def select_intervention(self, context: UserContext) -> Intervention:
         base_util = self._sample_utility(context.context, 0)
-        print(base_util)
+        #print(base_util)
         base_util_np: np.array = np.array(base_util, dtype=float)
         base_util_np = base_util_np / base_util_np.sum()
 
@@ -55,10 +55,10 @@ class RERec():
 
         #re = np.dot(utilities_np, np.log2(utilities_np / base_utilities_np))
         #re = util.relative_entropy(utilities_np, base_utilities_np)
-        print("base", base_utilities_np)
-        print("sample", utilities_np)
+        #print("base", base_utilities_np)
+        #print("sample", utilities_np)
         re = util.jaccard_like(utilities_np, base_utilities_np)
-        print("dist", re)
+        #print("dist", re)
 
         return re
 
