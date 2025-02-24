@@ -1,6 +1,6 @@
 from ch_bhvr.simple_user_sim import SimpleUserSimulator, SimpleUserSimParams, UserContext, ObservedUserBehavior, Intervention, Record, Records
 #from ch_bhvr.simple_user_sim2 import SimpleUserSimulator, SimpleUserSimParams, UserContext, ObservedUserBehavior, Intervention, Record, Records
-from ch_bhvr.relative_entropy_recommender import RERec
+from ch_bhvr.static_recommender import RERec
 #from ch_bhvr.rec_test import RERec
 from ch_bhvr.record_viewer import RecordViewer
 import numpy as np

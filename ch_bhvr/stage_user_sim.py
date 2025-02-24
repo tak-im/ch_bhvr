@@ -43,6 +43,10 @@ class StageUserSimParams():
         # behavior change
         self.auto_change_coeff: float = 0.0
         self.change_coeff: float = 1.0
+        # 勝手に行動が変わるのを防ぐ、(observed - base)/(next - base)がthreshold以下だとprogressは進まない
+        self.change_threshold: float = 0.1
+        # localprogressがこの値を超えると次のstageに進む
+        self.next_stage_progress: float = 0.9
 
 class Record():
     def __init__(self):       
@@ -181,7 +185,7 @@ class StageUserSimulator(IUserBehaviorSimulator):
         next_stage: int = stage + 1
         if next_stage >= params.stage_size:
             next_stage = params.stage_size - 1
-        local_progress: float = b / (params.stage_size - 1)
+        local_progress: float = b * (params.stage_size - 1)
         return (stage, next_stage, local_progress)
 
 
@@ -216,6 +220,12 @@ class StageUserSimulator(IUserBehaviorSimulator):
         stage, next_stage, local_progress = self._progress_detail()
         effect: np.ndarray = np.array(params.effect_to_temporal_distribution[stage][context][intervention])
         tmp_dist: np.ndarray = self._current_behavior_distribution.copy()
+
+        # effect は 次のstage行動分布に近づくように影響する（理解度）
+        stage_dist: np.ndarray = np.array(params.stage_distribution[stage])
+        next_dist: np.ndarray = np.array(params.stage_distribution[next_stage])
+        effect = (next_dist - stage_dist) * effect
+
         tmp_dist = tmp_dist + effect
         tmp_dist[0] = 1.0 - np.sum(tmp_dist[1:])
         return tmp_dist
@@ -227,28 +237,51 @@ class StageUserSimulator(IUserBehaviorSimulator):
         params: StageUserSimParams = self._params
         # 現在のstageで不足している行動
         stage, next_stage, local_progress = self._progress_detail()      
-        stage_d: np.ndarray = np.array(params.stage_distribution[stage])
+        #stage_d: np.ndarray = np.array(params.stage_distribution[stage])
         next_stage_d: np.ndarray = np.array(params.stage_distribution[next_stage])
 
-        # ステージ間で足らない行動
-        stage_diff: np.ndarray = next_stage_d - stage_d
-        stage_diff = stage_diff.clip(0, 1)
-        stage_diff[0] = 0.0
+        ## ステージ間で足らない行動
+        #stage_diff: np.ndarray = next_stage_d - stage_d
+        #stage_diff = stage_diff.clip(0, 1)
+        #stage_diff[0] = 0.0
+
+        print("===============================================================================")
+        print("current_dist: ", self._current_behavior_distribution)
+        print("next_dist: ", next_stage_d)
+
+        # 現在の基本分布
+        base_d: np.ndarray = self._current_behavior_distribution
+        # 現在の分布が次のステージに不足している行動分布
+        next_base_diff: np.ndarray = next_stage_d - base_d
+        next_base_diff = next_base_diff.clip(0,1)
+        next_base_diff[0] = 0.0
 
         # 経験した行動が足らない行動をどの程度満たしたか
         behavior_diff = behavior.hist.astype(np.float64)
         behavior_diff = behavior_diff / behavior_diff.sum()
-        behavior_diff = behavior_diff - stage_d
-        behavior_diff = behavior_diff.clip(0, stage_diff)
+        print("obesrved: ", behavior_diff)
+        behavior_diff = behavior_diff - base_d
+        behavior_diff = behavior_diff.clip(0, next_base_diff)
         behavior_diff[0] = 0.0
 
-        exp_progress: float = behavior_diff.sum() / stage_diff.sum()
+        print("observed-base: ", behavior_diff)
+        print("next-base: ", next_base_diff)
+
+        exp_progress: float = behavior_diff.sum() / next_base_diff.sum()
         print("progress: ", self._progress, ", stage: ", stage, ", local_progress: ", local_progress)
         print("exp_progress: ", exp_progress)
-        if exp_progress > local_progress:
-            progress_diff: float = exp_progress - local_progress
-            progress_diff = progress_diff / ( params.stage_size - 1 )
+        #if exp_progress > local_progress:
+        #    progress_diff: float = exp_progress - local_progress
+        #    progress_diff = progress_diff / ( params.stage_size - 1 )
+        #    self._progress = self._progress + progress_diff * params.change_coeff
+        if exp_progress > params.change_threshold:
+            progress_diff: float = (1.0 - local_progress) * exp_progress * params.change_coeff / (params.stage_size - 1)
             self._progress = self._progress + progress_diff * params.change_coeff
+            stage_new, next_stage_new, local_progress_new = self._progress_detail()
+            # local plogressが一定を超えたら次のstage
+            if local_progress_new > params.next_stage_progress and next_stage_new < params.stage_size - 1:
+                self._progress = next_stage_new / (params.stage_size - 1)
+
 
     def interaction(self, intervention: Intervention) -> ObservedUserBehavior:
         params: StageUserSimParams = self._params

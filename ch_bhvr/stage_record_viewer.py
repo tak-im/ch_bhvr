@@ -58,6 +58,7 @@ class RecordViewer():
         ivs_np: np.ndarray = np.array(ivs)
         bottom_np: np.ndarray = np.zeros(len(trials))
         for iv in range(self._records.params.intervention_size):
-            ax.bar(trials, ivs[iv], bottom=bottom_np.tolist(), width=10)
+            ax.bar(trials, ivs[iv], bottom=bottom_np.tolist(), width=10, label=str(iv))
             bottom_np = bottom_np + ivs_np[iv]
+        ax.legend(loc="upper left")
         #plt.show()
