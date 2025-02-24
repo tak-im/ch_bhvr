@@ -109,9 +109,11 @@ class ParticleFilter():
 
 class ProgressiveRecommender():
 
-    def __init__(self, len_intervention: int, len_behavior: int):
+    def __init__(self, len_intervention: int, len_behavior: int, ucb_param: float = 0.5, ucb_discount_rate: float=1.0):
         self._len_intervention: int = len_intervention
         self._len_behavior: int = len_behavior
+        self._ucb_param = ucb_param
+        self._ucb_discount_rate = ucb_discount_rate
 
         # 動作モード
         self._mode: OperationMode = OperationMode.INTERVENTION
@@ -131,12 +133,19 @@ class ProgressiveRecommender():
         self._count_cib: Dict[Tuple[int, int, int], int] = {} # (context, intervention, behavior) -> count
         self._reward_ci: Dict[Tuple[int, int], float] = {} # (context, intervention) -> sum of reward
 
-    def init_pf(self, particle_num: int, noise_std: float, init_dist: np.ndarray):
+        # 割引UCB用、重複するが別途管理する
+        self._discount_count_c: Dict[int, float] = {} # context -> count
+        self._discount_count_ci: Dict[Tuple[int, int], float] = {} # (context, intervention) -> intervention count
+        self._discount_reward_ci: Dict[Tuple[int, int], float] = {} # (context, intervention) -> sum of reward
+
+
+    def init_pf(self, particle_num: int, noise_std: float, initial_estimated_dist: np.ndarray):
         self._particle_num = particle_num
         self._noise_std = noise_std
-        self._pf = ParticleFilter(particle_num, self._len_behavior, noise_std, init_dist)
+        self._pf = ParticleFilter(particle_num, self._len_behavior, noise_std, initial_estimated_dist)
 
-    def set_params(self, params: Dict[Tuple[int, int], Tuple[int,int]]=None, 
+    # 使ってない
+    def set_thompson_params(self, params: Dict[Tuple[int, int], Tuple[int,int]]=None, 
                    count_ci: Dict[Tuple[int, int], int]=None, 
                    count_cib: Dict[Tuple[int, int, int], int]=None):
         if params is not None:
@@ -158,12 +167,14 @@ class ProgressiveRecommender():
             intervention.intervention = 0
             self._mode = OperationMode.INTERVENTION
         else:
-            base_distribution: np.ndarray = self._pf.estimated_distribution
-
+            #base_distribution: np.ndarray = self._pf.estimated_distribution
             scores: np.ndarray = np.zeros(self._len_intervention)
             for iv in range(self._len_intervention):
                 score: float = self._ucb_score(context.context, iv)
                 scores[iv] = score
+
+            print("++++++++++++++++++++++++++++")
+            print("ucb score: ", scores)
 
             selected: int = np.argmax(scores)
             intervention.intervention = selected
@@ -172,18 +183,19 @@ class ProgressiveRecommender():
         return intervention
 
     def _ucb_score(self, context: int, intervention: int) -> float:
-        total_reward_ci: float = self._reward_ci.get((context, intervention), 0.0)
-        count_ci: int = self._count_ci.get((context, intervention), 0)
-        count_c: int = self._count_c.get(context, 0)
+        total_reward_ci: float = self._discount_reward_ci.get((context, intervention), 0.0)
+        count_ci: float = self._discount_count_ci.get((context, intervention), 0.0)
+        count_c: float = self._discount_count_c.get(context, 0.0)
 
         score: float = 100.0
         if intervention == 0:
             score = 0.0
-        elif count_ci > 0:
+        elif count_ci > 0.0:
             score = total_reward_ci / count_ci
-            score += math.sqrt(math.log(float(count_c)) / (2.0 * count_ci))
+            score += math.sqrt(self._ucb_param * math.log(float(count_c)) / count_ci)
         return score
 
+    # 使ってない
     def _sample_score(self, context: int, intervention: int, base_dist_np: np.ndarray) -> float:
         distribution: List[float] = self._sample_distribution(context, intervention)
         dist_np = np.array(distribution)
@@ -198,6 +210,7 @@ class ProgressiveRecommender():
 
         return score
 
+    # 使ってない
     def _sample_distribution(self, context: int, intervention: int) -> List[float]: # by behavior
         distribution: List[float] = [0] * self._len_behavior
         count_ci_all_b: int = self._count_ci_b.get((context, intervention), 0)
@@ -218,6 +231,7 @@ class ProgressiveRecommender():
 
         return distribution
 
+    # 使ってない
     def _alphas(self, ci: Tuple[int, int]) -> List[float]:
         alphas: List[float] = self._params.get(ci, [1.0] * self._len_behavior)
         return alphas
@@ -229,7 +243,7 @@ class ProgressiveRecommender():
             print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
             print("estimated distribution: ", self._pf.estimated_distribution)
         else:
-            ci = (context.context, intervention.intervention)
+            ci: Tuple[int, int] = (context.context, intervention.intervention)
             observedBhaviors: List[int] = observed.behaviors
             self._count_c[context.context] = self._count_c.get(context.context, 0) + 1
             self._count_ci[ci] = self._count_ci.get(ci, 0) + 1
@@ -243,6 +257,17 @@ class ProgressiveRecommender():
 
             reward = util.jaccard_like(observed_dist, base_distribution)
             self._reward_ci[ci] = self._reward_ci.get(ci, 0) + reward
+
+            # 割引UCB用
+            self._discount_count_c[context.context] = self._discount_count_c.get(context.context, 0.0) * self._ucb_discount_rate + 1.0
+            self._discount_reward_ci[ci] = self._discount_reward_ci.get(ci, 0.0) * self._ucb_discount_rate + reward
+            for iv in range(self._len_intervention):
+                tmp_ci: Tuple[int, int] = (context.context, iv)
+                if iv == intervention.intervention:
+                    self._discount_count_ci[tmp_ci] = self._discount_count_ci.get(tmp_ci, 0.0) * self._ucb_discount_rate + 1.0
+                else:
+                    self._discount_count_ci[tmp_ci] = self._discount_count_ci.get(tmp_ci, 0.0) * self._ucb_discount_rate
+
 
 
 

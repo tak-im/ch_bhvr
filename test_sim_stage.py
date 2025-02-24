@@ -101,7 +101,7 @@ def main():
     print("observed: ", observed.behaviors)
     """
 
-    rec: ProgressiveRecommender = ProgressiveRecommender(params.intervention_size, params.behavior_size)
+    rec: ProgressiveRecommender = ProgressiveRecommender(params.intervention_size, params.behavior_size, ucb_discount_rate=1.0, ucb_param=0.5)
     rec.init_pf(100, 0.02, np.array([0.5, 0.1, 0.1, 0.1, 0.1, 0.1]))
     
     for t in range(100):
@@ -115,9 +115,9 @@ def main():
     for t in range(1000):
         print("===== step ", str(t), "=====")
         context: UserContext = sim.next_step()
-        #intervention: Intervention = rec.select_intervention(context)
-        intervention = Intervention()
-        intervention.intervention = 0
+        intervention: Intervention = rec.select_intervention(context)
+        #intervention = Intervention()
+        #intervention.intervention = 1
         observed: ObservedUserBehavior = sim.interaction(intervention)
         rec.update(context, intervention, observed)
         record: Record = sim.get_current_record()
